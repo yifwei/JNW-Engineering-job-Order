@@ -2,7 +2,7 @@
 
 ## Chinese and Tamil entry
 
-Complaint, Action Taken and Remarks accept Chinese or Tamil input. Press the field's
+Complaint, Action Taken, Remarks and each Materials and Parts Used description accept Chinese or Tamil input. Press the field's
 **Translate to English** button to replace its contents with editable English.
 Review the English before submitting. Only the final field contents are saved;
 no separate original/translated versions are retained. Translation requires internet

@@ -1,9 +1,12 @@
 'use strict';
 
-function installTranslation(form, { saveDraft, fetchImpl = fetch }) {
-  for (const button of form.querySelectorAll('[data-translate]')) {
-    const field = form.elements[button.dataset.translate];
-    const status = form.querySelector(`#${button.dataset.translate}TranslationStatus`);
+function installTranslation(form, { saveDraft, fetchImpl = fetch, root = form }) {
+  for (const button of root.querySelectorAll('[data-translate]')) {
+    if (button.dataset.translationBound) continue;
+    button.dataset.translationBound = 'true';
+    const row = button.closest?.('.part-row');
+    const field = row ? row.querySelector('[name="partDescription"]') : form.elements[button.dataset.translate];
+    const status = row ? row.querySelector('[data-translation-status]') : form.querySelector(`#${button.dataset.translate}TranslationStatus`);
     button.addEventListener('click', async () => {
       const original = field.value;
       if (!original.trim()) {
@@ -26,7 +29,7 @@ function installTranslation(form, { saveDraft, fetchImpl = fetch }) {
           throw new Error('Translation returned no text. Please try again.');
         }
         // Typing, resetting or submitting while waiting must not overwrite newer work.
-        if (field.value !== original) {
+        if (field.value !== original || (row && !row.isConnected)) {
           status.textContent = 'Text changed while translating. Press Translate again.';
           return;
         }

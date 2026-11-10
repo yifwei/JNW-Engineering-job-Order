@@ -501,6 +501,7 @@
     .translation-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px; }
     .translation-tools button { padding: 8px 12px; cursor: pointer; }
     .translation-tools small { color: #425466; }
+    .part-translation { grid-column: 2 / -1; margin-bottom: 4px; }
     @media print { .translation-tools { display: none; } }
   </style>
 </head>
@@ -958,6 +959,7 @@ const historyPinKey = 'jnw-job-order-history-pin-v1';
         <input name="partDescription" aria-label="Material or part used" value="${escapeAttr(part.description)}" />
         <input name="partCharge" type="text" aria-label="Quantity" value="${escapeAttr(part.quantity ?? part.charge)}" />
         <button type="button" class="remove-row no-print" aria-label="Remove item">Remove</button>
+        <div class="translation-tools part-translation no-print"><button type="button" data-translate="partDescription">Translate to English</button><small data-translation-status role="status" aria-live="polite"></small></div>
       `;
       row.querySelector('.remove-row').addEventListener('click', () => {
         row.remove();
@@ -966,6 +968,7 @@ const historyPinKey = 'jnw-job-order-history-pin-v1';
       });
       row.querySelectorAll('input').forEach((input) => input.addEventListener('input', () => saveDraft()));
       partsList.append(row);
+      installTranslation(form, { saveDraft, root: row });
       renumberPartRows();
     };
 

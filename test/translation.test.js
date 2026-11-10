@@ -103,3 +103,34 @@ test('empty input makes no translation request', async () => {
   assert.equal(ui.saves(), 0);
   assert.equal(ui.button.disabled, false);
 });
+
+test('dynamic material rows translate independently without changing quantities or binding twice', async () => {
+  let saves = 0;
+  const makeRow = (text, quantity) => {
+    const field = { value: text };
+    const status = { textContent: '' };
+    let click;
+    let bindings = 0;
+    const row = { isConnected: true, quantity,
+      querySelector: (selector) => selector === '[name="partDescription"]' ? field : status,
+      querySelectorAll: () => [button] };
+    const button = { dataset: { translate: 'partDescription' }, closest: () => row,
+      addEventListener: (type, fn) => { bindings++; click = fn; } };
+    return { row, field, button, click: () => click(), bindings: () => bindings };
+  };
+  const first = makeRow('水泵', '2');
+  const second = makeRow('வால்வு', '3');
+  const options = { saveDraft: () => saves++, fetchImpl: async () => ({ ok: true, json: async () => ({ text: 'Water pump' }) }) };
+  const form = { querySelectorAll: () => [first.button, second.button] };
+  installTranslation(form, { ...options, root: first.row });
+  installTranslation(form, { ...options, root: second.row });
+  installTranslation(form, options);
+  await first.click();
+  assert.equal(first.field.value, 'Water pump');
+  assert.equal(second.field.value, 'வால்வு');
+  assert.equal(first.row.quantity, '2');
+  assert.equal(second.row.quantity, '3');
+  assert.equal(first.bindings(), 1);
+  assert.equal(second.bindings(), 1);
+  assert.equal(saves, 1);
+});
