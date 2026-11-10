@@ -3,6 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#17466f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="JNW Job Order" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/jnw-job-order-icon.svg" />
   <title>JNW Engineering Job Order</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -138,6 +144,7 @@
       gap: 0.3rem;
     }
     input,
+    select,
     textarea {
       width: 100%;
       border: 1px solid var(--border);
@@ -153,6 +160,7 @@
       resize: vertical;
     }
     input:focus,
+    select:focus,
     textarea:focus {
       outline: 2px solid rgba(23, 70, 111, 0.16);
       border-color: var(--primary);
@@ -193,8 +201,7 @@
       justify-self: start;
       padding: 0 0.85rem;
     }
-    .remove-row,
-    .clear-sign {
+    .remove-row {
       display: none;
     }
     .remove-row {
@@ -210,10 +217,11 @@
       align-items: center;
       margin-bottom: 0.35rem;
     }
-    .clear-sign {
-      min-height: 34px;
-      padding: 0 0.65rem;
-      color: var(--accent);
+    .signature-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.35rem;
     }
     .history-panel {
       display: grid;
@@ -280,6 +288,33 @@
       gap: 0.45rem 0.85rem;
       color: var(--muted);
       font-weight: 700;
+    }
+    .history-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.25rem;
+    }
+    .history-actions a,
+    .history-actions button {
+      min-height: 34px;
+      padding: 0.35rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--primary-dark);
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .history-actions button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+    }
+    .history-note {
+      color: var(--muted);
+      font-size: 0.8rem;
     }
     canvas {
       width: 100%;
@@ -412,6 +447,7 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
       input,
+      select,
       textarea {
         border: 1px solid #b8c1cc;
         border-radius: 2px;
@@ -486,7 +522,32 @@
 
     <fieldset>
       <div class="grid two">
-        <label><span>Company</span><input name="company" autocomplete="organization" /></label>
+        <label><span>Company</span>
+          <input id="company" name="company" list="companyOptions" placeholder="Select or type company" autocomplete="organization" required />
+          <datalist id="companyOptions">
+            <option>J N W ENGINEERING PTE. LTD.</option>
+            <option>CENTRAL LAUNDRY PTE LTD</option>
+            <option>DNATA SINGAPORE</option>
+            <option>FOUR SEASON HOTEL SINGAPORE</option>
+            <option>HOTEL GRAND HYATT</option>
+            <option>HOTEL PAN PACIFIC</option>
+            <option>HOTEL THE CARLTON</option>
+            <option>NCCS</option>
+            <option>OCH</option>
+            <option>PEACE HAVE NURSING HOME</option>
+            <option>PRIMARY INDUSTRIES</option>
+            <option>SATS AERO LAUNDRY</option>
+            <option>SATS CATERING PTE LTD</option>
+            <option>SATS PANDAN LOOP</option>
+            <option>SATS PRIMARY</option>
+            <option>SCH - ACADEMIA</option>
+            <option>SGH</option>
+            <option>SICC1</option>
+            <option>SICC2</option>
+            <option>THE SOY COMPANY</option>
+            <option>Other</option>
+          </datalist>
+        </label>
         <label><span>Date</span><input name="date" type="date" /></label>
         <label><span>Requested By</span><input name="requestedBy" autocomplete="name" /></label>
       </div>
@@ -512,10 +573,11 @@
     </fieldset>
 
     <fieldset>
+      <div class="canvas-head"><span>Labour Description</span></div>
       <div class="grid three">
-        <label><span>Labour Description</span><input name="labourDescription" /></label>
         <label><span>Man</span><input name="labourMan" type="number" min="0" step="1" inputmode="numeric" /></label>
         <label><span>Hours</span><input name="labourHours" type="number" min="0" step="0.5" inputmode="decimal" /></label>
+        <label><span>Total Hrs</span><input name="labourTotalHours" readonly type="number" min="0" step="any" inputmode="decimal" /></label>
       </div>
     </fieldset>
 
@@ -528,16 +590,22 @@
       <div class="signature-grid">
         <div>
           <div class="canvas-head">
-            <span>Customer Signature and Chop</span>
-            <button type="button" class="clear-sign no-print" data-clear="customerSignature">Clear</button>
+            <span>Authorised Name &amp; Signature</span>
+            <div class="signature-actions no-print">
+              <button type="button" class="undo-sign" data-undo="customerSignature" aria-label="Undo last authorised signature mark" disabled>Undo last mark</button>
+            </div>
           </div>
+          <label class="signature-name"><input name="authorisedName" aria-label="Authorised name" placeholder="Name" autocomplete="name" /></label>
           <canvas id="customerSignature" width="600" height="220"></canvas>
         </div>
         <div>
           <div class="canvas-head">
-            <span>Technician Signature</span>
-            <button type="button" class="clear-sign no-print" data-clear="technicianSignature">Clear</button>
+            <span>Technician Name &amp; Signature</span>
+            <div class="signature-actions no-print">
+              <button type="button" class="undo-sign" data-undo="technicianSignature" aria-label="Undo last technician signature mark" disabled>Undo last mark</button>
+            </div>
           </div>
+          <label class="signature-name"><input name="technicianName" aria-label="Technician name" placeholder="Name" autocomplete="name" /></label>
           <canvas id="technicianSignature" width="600" height="220"></canvas>
         </div>
       </div>
@@ -579,10 +647,13 @@
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     const closeHistoryBtn = document.getElementById('closeHistoryBtn');
     const saveStatus = document.getElementById('saveStatus');
+    const companyInput = document.getElementById('company');
     const storageKey = 'jnw-standalone-mobile-job-order-v5';
     const sequenceKey = 'jnw-standalone-mobile-job-order-next-number';
     const historyKey = 'jnw-standalone-mobile-job-order-history';
+const historyPinKey = 'jnw-job-order-history-pin-v1';
     const signatureCanvases = ['customerSignature', 'technicianSignature'];
+    const signatureUndo = new Map();
     const officeServerUrl = 'http://192.168.10.38:4322/';
     const isGithubPage = location.hostname.endsWith('github.io');
     const isServerMode = location.protocol === 'http:' || location.protocol === 'https:';
@@ -640,12 +711,25 @@
     const escapeAttr = (value) => String(value || '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
     const calculateTotal = () => {
-      const partTotal = Array.from(partsList.querySelectorAll('[name="partCharge"]'))
-        .reduce((sum, input) => sum + moneyValue(input.value), 0);
-      return partTotal;
+      const man = form.elements.labourMan.value;
+      const hours = form.elements.labourHours.value;
+      const total = Number(man) * Number(hours);
+      form.elements.labourTotalHours.value = man !== '' && hours !== '' && Number(man) >= 0 && Number(hours) >= 0 && Number.isFinite(total)
+        ? String(Number(total.toFixed(6))) : '';
+    };
+
+    const updateCompanyField = () => {
+      if (companyInput.value === 'Other') {
+        companyInput.value = '';
+        companyInput.placeholder = 'Type new company name';
+        companyInput.focus();
+      } else if (!companyInput.value) {
+        companyInput.placeholder = 'Select or type company';
+      }
     };
 
     const collectData = () => {
+      calculateTotal();
       const data = Object.fromEntries(new FormData(form).entries());
       data.parts = Array.from(partsList.querySelectorAll('.part-row')).map((row) => ({
         serial: row.querySelector('[name="partSerial"]').value,
@@ -676,20 +760,55 @@
       }
     };
 
+    let sharedHistory = [];
+
+    const combinedHistory = () => {
+      const byJobOrder = new Map();
+      readHistory().forEach((entry) => byJobOrder.set(String(entry.jobOrder || ''), entry));
+      sharedHistory.forEach((entry) => byJobOrder.set(String(entry.jobOrder || ''), entry));
+      return [...byJobOrder.values()].sort((left, right) => Number(right.jobOrder) - Number(left.jobOrder));
+    };
+
+    const loadSharedHistory = async () => {
+      if (!isServerMode) return;
+  const pin = localStorage.getItem(historyPinKey) || window.prompt('Enter the shared History PIN');
+  if (!pin) return;
+      try {
+    const response = await fetch('/api/history', {
+      cache: 'no-store',
+      headers: { 'x-history-pin': pin },
+    });
+    if (!response.ok) {
+      localStorage.removeItem(historyPinKey);
+      alert('History PIN is incorrect. Please try again.');
+      return;
+    }
+    localStorage.setItem(historyPinKey, pin);
+        const data = await response.json();
+        sharedHistory = Array.isArray(data.reports) ? data.reports : [];
+        renderHistory();
+      } catch {
+        // The device history remains available when the network is offline.
+      }
+    };
+
     const writeHistory = (history) => {
       localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 100)));
     };
 
-    const saveHistoryEntry = () => {
+    const saveHistoryEntry = (report = {}) => {
       const entry = collectHistoryEntry();
+      entry.pdfFile = report.pdfFile || '';
+      entry.pdfUrl = report.pdfUrl || '';
+      entry.oneDriveUrl = report.webUrl || '';
       const history = readHistory().filter((item) => item.jobOrder !== entry.jobOrder);
       writeHistory([entry, ...history]);
     };
 
     const renderHistory = () => {
-      const history = readHistory();
+      const history = combinedHistory();
       if (!history.length) {
-        historyList.innerHTML = '<div class="history-empty">No saved job orders on this device.</div>';
+        historyList.innerHTML = '<div class="history-empty">No submitted job orders yet.</div>';
         return;
       }
 
@@ -699,6 +818,11 @@
           .map((part) => `${escapeAttr(part.serial)}. ${escapeAttr(part.description)}${part.charge ? ` - Qty ${escapeAttr(part.charge)}` : ''}`)
           .join('<br>');
         const savedDate = entry.savedAt ? new Date(entry.savedAt).toLocaleString() : '';
+        const reportActions = entry.pdfUrl && entry.pdfFile ? `
+          <div class="history-actions">
+            <a href="${escapeAttr(entry.pdfUrl)}" download="${escapeAttr(entry.pdfFile)}">Download PDF</a>
+            <button type="button" class="share-history-pdf" data-pdf-url="${escapeAttr(entry.pdfUrl)}" data-pdf-file="${escapeAttr(entry.pdfFile)}">Share PDF</button>
+          </div>` : '<p class="history-note">PDF download is available for job orders submitted after this update.</p>';
         return `
           <article class="history-card">
             <strong>Job Order ${escapeAttr(entry.jobOrder)}</strong>
@@ -711,8 +835,9 @@
             <p><strong>Complaint:</strong> ${escapeAttr(entry.complaint)}</p>
             <p><strong>Action Taken:</strong> ${escapeAttr(entry.actionTaken)}</p>
             <p><strong>Materials:</strong><br>${parts || 'None'}</p>
-            <p><strong>Labour:</strong> ${escapeAttr(entry.labourDescription)} ${escapeAttr(entry.labourMan)} man ${escapeAttr(entry.labourHours)} hours</p>
+            <p><strong>Labour:</strong> ${escapeAttr(entry.labourDescription)} ${escapeAttr(entry.labourMan)} man ${escapeAttr(entry.labourHours)} hours; Total Hrs: ${escapeAttr(entry.labourTotalHours)}</p>
             <p><strong>Remarks:</strong> ${escapeAttr(entry.remarks)}</p>
+            ${reportActions}
           </article>
         `;
       }).join('');
@@ -726,15 +851,42 @@
       }
     };
 
+    const updateUndoButton = (id) => {
+      const button = document.querySelector(`[data-undo="${id}"]`);
+      if (button) button.disabled = !(signatureUndo.get(id)?.length);
+    };
+
+    const rememberSignature = (id) => {
+      const canvas = document.getElementById(id);
+      const history = signatureUndo.get(id) || [];
+      history.push(canvas.toDataURL('image/png'));
+      if (history.length > 20) history.shift();
+      signatureUndo.set(id, history);
+      updateUndoButton(id);
+    };
+
+    const undoSignature = (id) => {
+      const history = signatureUndo.get(id) || [];
+      const previous = history.pop();
+      if (!previous) return;
+      signatureUndo.set(id, history);
+      restoreSignature(id, previous);
+      updateUndoButton(id);
+      saveDraft(true);
+    };
+
     const clearSignatures = () => {
       signatureCanvases.forEach((id) => {
         const canvas = document.getElementById(id);
         canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        signatureUndo.delete(id);
+        updateUndoButton(id);
       });
     };
 
     const prepareBlankJobOrder = (number = nextJobNumber()) => {
       form.reset();
+      updateCompanyField();
       setJobOrderNumber(number);
       setCurrentDate();
       partsList.querySelectorAll('.part-row').forEach((row) => row.remove());
@@ -767,6 +919,7 @@
         alert('Please open the server link first. Direct file links cannot submit reports into OneDrive.');
         return;
       }
+      if (!form.reportValidity()) return;
 
       saveDraft();
       saveBtn.disabled = true;
@@ -779,7 +932,8 @@
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Submit failed.');
 
-        saveHistoryEntry();
+        setJobOrderNumber(result.jobOrder);
+        saveHistoryEntry(result);
         localStorage.removeItem(storageKey);
         prepareBlankJobOrder(Number(result.nextJobOrder || nextJobNumber()));
         const savedFolder = result.oneDriveFolder || 'My files';
@@ -804,7 +958,7 @@
       row.innerHTML = `
         <input name="partSerial" inputmode="numeric" aria-label="Serial number" value="${escapeAttr(part.serial)}" readonly />
         <input name="partDescription" aria-label="Material or part used" value="${escapeAttr(part.description)}" />
-        <input name="partCharge" type="number" min="0" step="1" inputmode="numeric" aria-label="Quantity" value="${escapeAttr(part.charge)}" />
+        <input name="partCharge" type="text" aria-label="Quantity" value="${escapeAttr(part.quantity ?? part.charge)}" />
         <button type="button" class="remove-row no-print" aria-label="Remove item">Remove</button>
       `;
       row.querySelector('.remove-row').addEventListener('click', () => {
@@ -855,6 +1009,7 @@
       };
       const start = (event) => {
         event.preventDefault();
+        rememberSignature(id);
         drawing = true;
         const p = point(event);
         context.beginPath();
@@ -914,6 +1069,13 @@
     };
 
     form.addEventListener('input', () => saveDraft());
+    companyInput.addEventListener('change', () => {
+      updateCompanyField();
+      saveDraft();
+    });
+    companyInput.addEventListener('input', () => {
+      if (companyInput.value === 'Other') updateCompanyField();
+    });
     addPartBtn.addEventListener('click', () => {
       addPartRow();
       saveDraft(true);
@@ -922,7 +1084,36 @@
     historyBtn.addEventListener('click', () => {
       renderHistory();
       historyPanel.hidden = !historyPanel.hidden;
-      if (!historyPanel.hidden) historyPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (!historyPanel.hidden) {
+        historyPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        loadSharedHistory();
+      }
+    });
+    historyList.addEventListener('click', async (event) => {
+      const button = event.target.closest('.share-history-pdf');
+      if (!button) return;
+      const url = button.dataset.pdfUrl;
+      const fileName = button.dataset.pdfFile || 'JNW-Job-Order.pdf';
+      button.disabled = true;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('PDF is not available.');
+        const file = new File([await response.blob()], fileName, { type: 'application/pdf' });
+        if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+          await navigator.share({ title: fileName, files: [file] });
+        } else {
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(file);
+          link.download = fileName;
+          link.click();
+          URL.revokeObjectURL(link.href);
+          setStatus('PDF downloaded. Attach it in WhatsApp to send the customer.');
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') alert(error.message || 'Could not share PDF.');
+      } finally {
+        button.disabled = false;
+      }
     });
     closeHistoryBtn.addEventListener('click', () => {
       historyPanel.hidden = true;
@@ -954,16 +1145,16 @@
       prepareBlankJobOrder();
       setStatus('Draft cleared.');
     });
-    document.querySelectorAll('.clear-sign').forEach((button) => {
-      button.addEventListener('click', () => {
-        const canvas = document.getElementById(button.dataset.clear);
-        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-        saveDraft(true);
-      });
+    document.querySelectorAll('.undo-sign').forEach((button) => {
+      button.addEventListener('click', () => undoSignature(button.dataset.undo));
     });
 
     signatureCanvases.forEach(setupSignature);
     installTranslation(form, { saveDraft });
+    updateCompanyField();
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
+    }
     loadDraft();
     fetchServerJobNumber();
   </script>

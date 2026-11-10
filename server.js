@@ -8,7 +8,8 @@ const { translateToEnglish } = require('./translation');
 const PORT = Number(process.env.PORT || 4322);
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = __dirname;
-const REPORTS_DIR = path.join(ROOT, 'Reports');
+const REPORTS_DIR = path.resolve(process.env.REPORTS_DIR || path.join(ROOT, 'Reports'));
+const sequence = require('./sequence')(REPORTS_DIR);
 const SEQUENCE_FILE = path.join(REPORTS_DIR, '.sequence.json');
 const LOG_FILE = path.join(REPORTS_DIR, 'Job_Order_Log.csv');
 
@@ -16,6 +17,7 @@ const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const GRAPH_ONEDRIVE_SITE_ID = process.env.GRAPH_ONEDRIVE_SITE_ID
   || 'jnwengineering-my.sharepoint.com,93983fb9-90e8-4aae-a4dd-87c3eb396f02,58b5320c-42b8-4018-b508-1ab09a838e88';
 const GRAPH_ONEDRIVE_DRIVE_ID = process.env.GRAPH_ONEDRIVE_DRIVE_ID || '';
+const GRAPH_ONEDRIVE_FOLDER_ID = process.env.GRAPH_ONEDRIVE_FOLDER_ID || '';
 const GRAPH_ONEDRIVE_FOLDER_PATH = process.env.GRAPH_ONEDRIVE_FOLDER_PATH || '{year}';
 
 let graphTokenCache = null;
@@ -28,6 +30,8 @@ const mimeTypes = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.csv': 'text/csv; charset=utf-8',
 };
@@ -54,19 +58,7 @@ const ensureReportsDir = async () => {
   await fs.mkdir(REPORTS_DIR, { recursive: true });
 };
 
-const readSequence = async () => {
-  await ensureReportsDir();
-  try {
-    const sequence = JSON.parse(await fs.readFile(SEQUENCE_FILE, 'utf8'));
-    return Number.isFinite(sequence.nextJobOrder) ? sequence.nextJobOrder : 1;
-  } catch {
-    return 1;
-  }
-};
-
-const writeSequence = async (nextJobOrder) => {
-  await fs.writeFile(SEQUENCE_FILE, JSON.stringify({ nextJobOrder }, null, 2));
-};
+const readSequence = sequence.read;
 
 const formatJobOrder = (number) => String(Math.max(1, Number(number) || 1)).padStart(2, '0');
 
@@ -165,82 +157,7 @@ const wrapText = (value, maxChars = 88) => {
   return lines.length ? lines : [''];
 };
 
-const createPdfBuffer = (data) => {
-  const lines = [];
-  const text = (x, y, size, value, font = 'F1') => {
-    lines.push(`BT /${font} ${size} Tf ${x} ${y} Td (${pdfEscape(value)}) Tj ET`);
-  };
-  const rect = (x, y, w, h) => {
-    lines.push(`${x} ${y} ${w} ${h} re S`);
-  };
-  const label = (x, y, value) => text(x, y, 9, value, 'F2');
-  const box = (x, y, w, h, labelText, value, maxChars = 40) => {
-    label(x, y + h + 7, labelText);
-    rect(x, y, w, h);
-    wrapText(value, maxChars).slice(0, Math.max(1, Math.floor(h / 13))).forEach((line, index) => {
-      text(x + 7, y + h - 16 - (index * 13), 11, line);
-    });
-  };
-
-  lines.push('0.5 w');
-  text(28, 785, 18, 'JNW ENGINEERING PTE LTD', 'F2');
-  text(390, 790, 11, 'JOB ORDER', 'F2');
-  text(390, 765, 22, data.jobOrder, 'F2');
-  lines.push('28 742 m 567 742 l S');
-
-  box(28, 692, 250, 34, 'COMPANY', data.company);
-  box(310, 692, 250, 34, 'DATE', data.date);
-  box(28, 640, 250, 34, 'REQUESTED BY', data.requestedBy);
-  box(28, 532, 532, 78, 'COMPLAINT', data.complaint, 92);
-  box(28, 397, 532, 105, 'ACTION TAKEN', data.actionTaken, 92);
-
-  text(28, 370, 12, 'MATERIALS AND PARTS USED', 'F2');
-  label(28, 350, 'S/NO');
-  label(85, 350, 'MATERIALS AND PARTS USED');
-  label(475, 350, 'QUANTITY');
-  let rowY = 316;
-  const parts = normaliseParts(data.parts);
-  (parts.length ? parts : [{ serial: '1', description: '', quantity: '' }]).slice(0, 6).forEach((part) => {
-    box(28, rowY, 45, 26, '', part.serial, 5);
-    box(85, rowY, 375, 26, '', part.description, 62);
-    box(475, rowY, 85, 26, '', part.quantity, 12);
-    rowY -= 32;
-  });
-
-  text(28, rowY + 7, 12, 'LABOUR', 'F2');
-  box(28, rowY - 45, 165, 32, 'LABOUR DESCRIPTION', data.labourDescription, 25);
-  box(210, rowY - 45, 165, 32, 'MAN', data.labourMan, 20);
-  box(395, rowY - 45, 165, 32, 'HOURS', data.labourHours, 20);
-  box(28, rowY - 145, 532, 68, 'REMARKS', data.remarks, 92);
-
-  text(28, rowY - 174, 12, 'SIGNATURES', 'F2');
-  box(28, rowY - 305, 250, 105, 'CUSTOMER SIGNATURE AND CHOP', '', 40);
-  box(310, rowY - 305, 250, 105, 'TECHNICIAN SIGNATURE', '', 40);
-
-  const content = lines.join('\n');
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
-    `<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`,
-  ];
-
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(Buffer.byteLength(pdf, 'utf8'));
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = Buffer.byteLength(pdf, 'utf8');
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
-  });
-  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return Buffer.from(pdf, 'utf8');
-};
+const createPdfBuffer = require('./pdf-report');
 
 const getGraphToken = async () => {
   if (graphTokenCache && graphTokenCache.expiresOn > Date.now() + 120000) {
@@ -319,6 +236,16 @@ const resolveDrive = async () => {
   return graphDriveCache;
 };
 
+const checkOneDriveConnection = async () => {
+  const { driveId } = await resolveDrive();
+  const date = new Date().toISOString();
+  const reportYear = getReportYear(date.slice(0, 10), new Date(date));
+  const folderPath = `${buildReportFolderPath({ date: date.slice(0, 10), submittedAt: date }).replace(/\/+$/, '')}/Online JO/${reportYear}`;
+  const item = await graphRequest(`/drives/${driveId}/root:/${encodeSharePointPath(folderPath)}:`);
+  if (!item?.folder) throw new Error('Configured OneDrive report folder is not available.');
+  return { ok: true };
+};
+
 const ensureFolderPath = async (driveId, folderPath) => {
   const parts = String(folderPath || '').split('/').map((part) => part.trim()).filter(Boolean);
   let currentPath = '';
@@ -342,11 +269,34 @@ const ensureFolderPath = async (driveId, folderPath) => {
   }
 };
 
-const uploadPdfToOneDrive = async (fileName, pdfBuffer, folderPath) => {
+const uploadPdfToOneDrive = async (fileName, pdfBuffer, folderPath, reportYear) => {
   const { driveId } = await resolveDrive();
-  await ensureFolderPath(driveId, folderPath);
-  const uploadPath = encodeSharePointPath(`${folderPath}/${fileName}`);
-  return graphRequest(`/drives/${driveId}/root:/${uploadPath}:/content`, {
+  let uploadUrl;
+  if (GRAPH_ONEDRIVE_FOLDER_ID) {
+    let destinationId = GRAPH_ONEDRIVE_FOLDER_ID;
+    for (const name of ['Online JO', reportYear]) {
+    const parent = `/drives/${driveId}/items/${encodeURIComponent(destinationId)}`;
+    let folder;
+    try {
+      folder = await graphRequest(`${parent}/children`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+      });
+    } catch (error) {
+      if (!String(error.message).includes('nameAlreadyExists')) throw error;
+      folder = await graphRequest(`${parent}:/${encodeURIComponent(name)}`);
+    }
+    if (!folder?.id || !folder.folder) throw new Error('Online JO destination is not a folder.');
+    destinationId = folder.id;
+    }
+    uploadUrl = `/drives/${driveId}/items/${encodeURIComponent(destinationId)}:/${encodeURIComponent(fileName)}:/content`;
+  } else {
+    await ensureFolderPath(driveId, folderPath);
+    const uploadPath = encodeSharePointPath(`${folderPath}/${fileName}`);
+    uploadUrl = `/drives/${driveId}/root:/${uploadPath}:/content`;
+  }
+  return graphRequest(uploadUrl, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/pdf' },
     body: pdfBuffer,
@@ -399,12 +349,12 @@ const appendCsv = async (data, pdfFile, jsonFile) => {
 
 const saveLocalBackup = async (jsonFile, data, pdfFile, pdfBuffer) => {
   await ensureReportsDir();
-  await fs.writeFile(path.join(REPORTS_DIR, jsonFile), JSON.stringify(data, null, 2), 'utf8');
-  await fs.writeFile(path.join(REPORTS_DIR, pdfFile), pdfBuffer);
+  await fs.writeFile(path.join(REPORTS_DIR, jsonFile), JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'wx' });
+  await fs.writeFile(path.join(REPORTS_DIR, pdfFile), pdfBuffer, { flag: 'wx' });
 };
 
 const saveSubmission = async (payload) => {
-  const nextNumber = await readSequence();
+  const nextNumber = await sequence.reserve();
   const jobOrder = formatJobOrder(nextNumber);
   const nextJobOrder = nextNumber + 1;
   const submittedAt = new Date().toISOString();
@@ -415,32 +365,99 @@ const saveSubmission = async (payload) => {
   const pdfFile = `${baseName}.pdf`;
   const data = { ...payload, jobOrder, submittedAt };
 
-  const pdfBuffer = createPdfBuffer(data);
-  const reportFolderPath = buildReportFolderPath(data);
-  const uploadedFile = await uploadPdfToOneDrive(pdfFile, pdfBuffer, reportFolderPath);
+  const pdfBuffer = await createPdfBuffer(data);
+  const reportYear = getReportYear(data.date, new Date(submittedAt));
+  const reportFolderPath = `${buildReportFolderPath(data).replace(/\/+$/, '')}/Online JO/${reportYear}`;
+  const uploadedFile = await uploadPdfToOneDrive(pdfFile, pdfBuffer, reportFolderPath, reportYear);
   await saveLocalBackup(jsonFile, data, pdfFile, pdfBuffer);
   await appendCsv(data, pdfFile, jsonFile);
-  await writeSequence(nextJobOrder);
+
 
   return {
     jobOrder,
     nextJobOrder: formatJobOrder(nextJobOrder),
     pdfFile,
+    pdfUrl: `/api/reports/${encodeURIComponent(pdfFile)}`,
     oneDriveFolder: `${graphDriveCache?.libraryName || 'My files'}/${reportFolderPath}`,
     webUrl: uploadedFile.webUrl,
   };
 };
 
-const serveStatic = async (request, response) => {
-  const url = new URL(request.url, `http://${request.headers.host}`);
-  const requestPath = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
-  const filePath = path.normalize(path.join(ROOT, requestPath));
-
-  if (!filePath.startsWith(ROOT)) {
-    response.writeHead(403);
-    response.end('Forbidden');
+const serveReportPdf = async (request, response, pathname) => {
+  let fileName;
+  try {
+    fileName = decodeURIComponent(pathname.slice('/api/reports/'.length));
+  } catch {
+    response.writeHead(404);
+    response.end('Not found');
     return;
   }
+
+  if (!/^[\w .-]+\.pdf$/i.test(fileName) || path.basename(fileName) !== fileName) {
+    response.writeHead(404);
+    response.end('Not found');
+    return;
+  }
+
+  try {
+    const file = await fs.readFile(path.join(REPORTS_DIR, fileName));
+    response.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${fileName.replaceAll('"', '')}"`,
+      'Cache-Control': 'private, no-store',
+    });
+    response.end(file);
+  } catch {
+    response.writeHead(404);
+    response.end('Not found');
+  }
+};
+
+const listSharedHistory = async () => {
+  await ensureReportsDir();
+  const files = await fs.readdir(REPORTS_DIR, { withFileTypes: true });
+  const reports = await Promise.all(files
+    .filter((file) => file.isFile() && file.name.toLowerCase().endsWith('.json') && !file.name.startsWith('.'))
+    .map(async (file) => {
+      try {
+        const data = JSON.parse(await fs.readFile(path.join(REPORTS_DIR, file.name), 'utf8'));
+        const { signatures, ...report } = data;
+        const pdfFile = `${file.name.slice(0, -'.json'.length)}.pdf`;
+        return {
+          ...report,
+          savedAt: report.submittedAt || '',
+          pdfFile,
+          pdfUrl: `/api/reports/${encodeURIComponent(pdfFile)}`,
+        };
+      } catch {
+        return null;
+      }
+    }));
+
+  return reports
+    .filter(Boolean)
+    .sort((left, right) => Number(right.jobOrder) - Number(left.jobOrder))
+    .slice(0, 200);
+};
+
+const serveStatic = async (request, response) => {
+  const url = new URL(request.url, 'http://localhost');
+  const publicFiles = new Map([
+    ['/translate-form.js', 'translate-form.js'],
+    ['/', 'index.html'],
+    ['/index.html', 'index.html'],
+    ['/JNW.png', 'JNW.png'],
+    ['/manifest.webmanifest', 'manifest.webmanifest'],
+    ['/service-worker.js', 'service-worker.js'],
+    ['/jnw-job-order-icon.svg', 'jnw-job-order-icon.svg'],
+  ]);
+  const publicFile = publicFiles.get(url.pathname);
+  if (!publicFile) {
+    response.writeHead(404, { 'Cache-Control': 'no-store' });
+    response.end('Not found');
+    return;
+  }
+  const filePath = path.join(ROOT, publicFile);
 
   try {
     const file = await fs.readFile(filePath);
@@ -457,7 +474,8 @@ const serveStatic = async (request, response) => {
 
 const server = http.createServer(async (request, response) => {
   try {
-    if (request.method === 'POST' && request.url === '/api/translate') {
+    const url = new URL(request.url, 'http://localhost');
+    if (request.method === 'POST' && url.pathname === '/api/translate') {
       try {
         let payload;
         try { payload = JSON.parse(await readBody(request)); }
@@ -468,15 +486,33 @@ const server = http.createServer(async (request, response) => {
       }
       return;
     }
-
-    if (request.method === 'GET' && request.url.startsWith('/api/next-job-order')) {
+    if (request.method === 'GET' && url.pathname === '/api/next-job-order') {
       json(response, 200, { nextJobOrder: formatJobOrder(await readSequence()) });
       return;
     }
 
-    if (request.method === 'POST' && request.url.startsWith('/api/submit')) {
+    if (request.method === 'GET' && url.pathname === '/api/one-drive-health') {
+      json(response, 200, await checkOneDriveConnection());
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/history') {
+    if (!process.env.HISTORY_ACCESS_PIN || request.headers['x-history-pin'] !== process.env.HISTORY_ACCESS_PIN) {
+      json(response, 401, { error: 'History access PIN is required.' });
+      return;
+    }
+      json(response, 200, { reports: await listSharedHistory() });
+      return;
+    }
+
+    if (request.method === 'POST' && new URL(request.url, 'http://localhost').pathname === '/api/submit') {
       const payload = JSON.parse(await readBody(request));
       json(response, 200, await saveSubmission(payload));
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname.startsWith('/api/reports/')) {
+      await serveReportPdf(request, response, url.pathname);
       return;
     }
 
@@ -488,11 +524,14 @@ const server = http.createServer(async (request, response) => {
     response.writeHead(405);
     response.end('Method not allowed');
   } catch (error) {
-    json(response, 500, { error: error.message || 'Server error.' });
+    console.error('Request failed:', error);
+    json(response, 500, { error: 'Unable to complete the request. Please contact the administrator.' });
   }
 });
 
-server.listen(PORT, HOST, () => {
+if (require.main === module) server.listen(PORT, HOST, () => {
   console.log(`JNW Job Order server running at http://localhost:${PORT}/`);
-  console.log(`Reports upload to: My files/${GRAPH_ONEDRIVE_FOLDER_PATH}`);
+  console.log(`Reports upload to: My files/${GRAPH_ONEDRIVE_FOLDER_PATH}/Online JO/{job year}`);
 });
+
+module.exports = { server };
