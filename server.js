@@ -3,6 +3,7 @@ const https = require('https');
 const fs = require('fs/promises');
 const path = require('path');
 const os = require('os');
+const { translateToEnglish } = require('./translation');
 
 const PORT = Number(process.env.PORT || 4322);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -456,6 +457,18 @@ const serveStatic = async (request, response) => {
 
 const server = http.createServer(async (request, response) => {
   try {
+    if (request.method === 'POST' && request.url === '/api/translate') {
+      try {
+        let payload;
+        try { payload = JSON.parse(await readBody(request)); }
+        catch { json(response, 400, { error: 'Invalid translation request.' }); return; }
+        json(response, 200, await translateToEnglish(payload));
+      } catch (error) {
+        json(response, error.status || 502, { error: error.status ? error.message : 'Translation failed. Your text has been kept.' });
+      }
+      return;
+    }
+
     if (request.method === 'GET' && request.url.startsWith('/api/next-job-order')) {
       json(response, 200, { nextJobOrder: formatJobOrder(await readSequence()) });
       return;

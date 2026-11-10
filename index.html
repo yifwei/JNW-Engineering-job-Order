@@ -462,6 +462,11 @@
         border-color: #b8c1cc;
       }
     }
+    .translation-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px; }
+    .translation-tools button { padding: 8px 12px; cursor: pointer; }
+    .translation-tools small { color: #425466; }
+    .translation-help { font-size: 13px; color: #425466; }
+    @media print { .translation-tools { display: none; } }
   </style>
 </head>
 <body>
@@ -488,8 +493,11 @@
     </fieldset>
 
     <fieldset>
+      <p class="translation-help no-print">Type Chinese or Tamil, then press Translate to English. The English replaces your text; review it before submitting.</p>
       <label><span>Complaint</span><textarea name="complaint" rows="3"></textarea></label>
+      <div class="translation-tools no-print"><button type="button" data-translate="complaint">Translate to English</button><small id="complaintTranslationStatus" role="status" aria-live="polite"></small></div>
       <label><span>Action Taken</span><textarea name="actionTaken" rows="5"></textarea></label>
+      <div class="translation-tools no-print"><button type="button" data-translate="actionTaken">Translate to English</button><small id="actionTakenTranslationStatus" role="status" aria-live="polite"></small></div>
     </fieldset>
 
     <fieldset>
@@ -513,6 +521,7 @@
 
     <fieldset>
       <label><span>Remarks</span><textarea name="remarks" rows="3"></textarea></label>
+      <div class="translation-tools no-print"><button type="button" data-translate="remarks">Translate to English</button><small id="remarksTranslationStatus" role="status" aria-live="polite"></small></div>
     </fieldset>
 
     <fieldset>
@@ -554,6 +563,7 @@
     </div>
   </form>
 
+  <script src="translate-form.js"></script>
   <script>
     const form = document.getElementById('jobForm');
     const partsList = document.getElementById('partsList');
@@ -953,6 +963,7 @@
     });
 
     signatureCanvases.forEach(setupSignature);
+    installTranslation(form, { saveDraft });
     loadDraft();
     fetchServerJobNumber();
   </script>
