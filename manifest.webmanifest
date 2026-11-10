@@ -1,0 +1,16 @@
+{
+  "name": "JNW Engineering Job Order",
+  "short_name": "JNW Job Order",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#17466f",
+  "icons": [
+    {
+      "src": "/jnw-job-order-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
